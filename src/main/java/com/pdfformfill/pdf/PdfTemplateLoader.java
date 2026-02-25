@@ -3,6 +3,7 @@ package com.pdfformfill.pdf;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.io.RandomAccessReadBuffer;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,6 +12,7 @@ import java.io.InputStream;
  * 加载 PDF 模板为 {@link PDDocument}，不填表、仅加载。
  * 调用方负责关闭返回的 PDDocument（或使用 try-with-resources）。
  */
+@Component
 public class PdfTemplateLoader {
 
     /**
