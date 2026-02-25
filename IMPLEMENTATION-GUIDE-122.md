@@ -47,7 +47,7 @@
 
 ### 阶段 0：项目与配置
 
-- **先做**：新建 Spring Boot 项目（或在本仓库下新建独立 module），Java 17+，Spring Boot 3.x。
+- **先做**：新建 Spring Boot 项目（或在本仓库下新建独立 module），Java 17+，Spring Boot 3.x。在项目根目录创建 `.gitignore`（见本文档 **§8**），避免把构建产物、IDE 配置、生成的 PDF 等提交到 GitHub。
 - **依赖**（`pom.xml` 或 Gradle）：
   - `spring-boot-starter-web`
   - `org.apache.pdfbox:pdfbox`（2.x 或 3.x，推荐 3.x 若用 Java 17+）
@@ -149,3 +149,70 @@
 - 输出路径需考虑权限与目录存在性；若目录不存在可先创建或返回 500 与清晰信息。
 
 完成上述阶段后，即可得到可独立运行、通过 Swagger UI 验收的后端；之后再在 frontend 中增加“上传 PDF + JSON 并调用本 API”的流程即可完成前后端对接。
+
+---
+
+## 8. 后端项目 `.gitignore`
+
+在后端项目**根目录**新建 `.gitignore`，避免把构建产物、IDE 配置、生成文件等提交到 GitHub。建议内容如下（Maven 为主；若用 Gradle 保留 `build/` 即可）：
+
+```gitignore
+# Build
+target/
+build/
+out/
+*.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.war
+*.ear
+*.class
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.vscode/
+*.code-workspace
+
+# Logs & temp
+*.log
+logs/
+*.tmp
+*.temp
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated PDF output（与 pdf.output.dir 对应，若写在本项目目录下）
+output/
+generated-pdfs/
+filled-pdfs/
+
+# Local / env（避免提交含路径或密钥的配置）
+application-local.yml
+application-local.properties
+.env
+.env.local
+*.local
+
+# Maven
+pom.xml.tag
+pom.releaseBackup
+*.releaseBackup
+```
+
+**补充说明**：
+
+- **构建**：`target/`（Maven）、`build/`（Gradle）必须忽略；否则每次编译都会产生大量可重新生成的文件。
+- **IDE**：不同人可能用 IntelliJ / Eclipse / VS Code，忽略各自配置可避免合并冲突和因人而异的文件。
+- **生成 PDF**：若 `pdf.output.dir` 指向项目内的 `output/` 或 `filled-pdfs/` 等目录，务必在 `.gitignore` 中写上该目录名，避免把测试生成的 PDF 提交进仓库。
+- **本地配置**：若用 `application-local.yml` 存本机路径或密钥，不要提交；可提交 `application-local.yml.example` 作为模板。
+- **依赖/锁文件**：Maven 的 `pom.xml` 要提交；Gradle 的 `gradle-wrapper.jar` 若存在可提交，`gradle-wrapper.properties` 一般也提交；不需要把整个 `~/.m2/repository` 拷进项目。
