@@ -29,7 +29,7 @@ public class PdfFormFillService {
     private final FieldDataPreparer fieldDataPreparer;
     private final PdfFormFiller pdfFormFiller;
 
-    @Value("${pdf.output.dir}")
+    @Value("${pdf.output.dir:${user.dir}/filled-pdfs}")
     private String outputDir;
 
     public PdfFormFillService(
@@ -67,7 +67,8 @@ public class PdfFormFillService {
     }
 
     private String saveToOutputDir(PDDocument document) throws IOException {
-        Path dir = Paths.get(outputDir);
+        String dirStr = outputDir != null ? outputDir : System.getProperty("user.dir") + "/filled-pdfs";
+        Path dir = Paths.get(dirStr);
         Files.createDirectories(dir);
         String filename = "filled-" + UUID.randomUUID() + ".pdf";
         Path target = dir.resolve(filename);

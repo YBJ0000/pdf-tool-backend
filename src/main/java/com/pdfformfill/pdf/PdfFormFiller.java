@@ -45,7 +45,11 @@ public class PdfFormFiller {
                 log.warn("No AcroForm field found for name: {}", name);
                 continue;
             }
-            setFieldValue(field, value);
+            try {
+                setFieldValue(field, value);
+            } catch (Exception e) {
+                log.warn("Failed to set value for field '{}': {}", name, e.getMessage());
+            }
         }
     }
 
