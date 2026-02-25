@@ -1,0 +1,53 @@
+# Build
+target/
+build/
+out/
+*.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.war
+*.ear
+*.class
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.vscode/
+*.code-workspace
+
+# Logs & temp
+*.log
+logs/
+*.tmp
+*.temp
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated PDF output（与 pdf.output.dir 对应，若写在本项目目录下）
+output/
+generated-pdfs/
+filled-pdfs/
+
+# Local / env（避免提交含路径或密钥的配置）
+application-local.yml
+application-local.properties
+.env
+.env.local
+*.local
+
+# Gradle
+.gradle/
+
+# Maven (if ever re-added)
+pom.xml.tag
+pom.releaseBackup
+*.releaseBackup
