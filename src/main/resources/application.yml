@@ -1,0 +1,19 @@
+# PDF form fill backend — Issue #122
+server:
+  port: 8080
+
+# 生成 PDF 的输出目录（可覆盖为绝对路径，如 /var/pdf-output）
+pdf:
+  output:
+    dir: ${user.dir}/filled-pdfs
+
+spring:
+  application:
+    name: pdf-form-fill-backend
+
+# Swagger UI: /swagger-ui.html 或 /swagger-ui/index.html
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
