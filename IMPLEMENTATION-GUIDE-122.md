@@ -48,12 +48,12 @@
 ### 阶段 0：项目与配置
 
 - **先做**：新建 Spring Boot 项目（或在本仓库下新建独立 module），Java 17+，Spring Boot 3.x。在项目根目录创建 `.gitignore`（见本文档 **§8**），避免把构建产物、IDE 配置、生成的 PDF 等提交到 GitHub。
-- **依赖**（`pom.xml` 或 Gradle）：
+- **依赖**（Gradle `build.gradle`，与 medical-server 一致便于后续迁移）：
   - `spring-boot-starter-web`
   - `org.apache.pdfbox:pdfbox`（2.x 或 3.x，推荐 3.x 若用 Java 17+）
   - `springdoc-openapi-starter-webmvc-ui`（Swagger UI）
 - **配置**：在 `application.yml` 中预留“输出目录”配置，例如 `pdf.output.dir`，用于保存生成的 PDF。
-- **验收**：`mvn spring-boot:run` 启动成功，访问 `/swagger-ui.html` 能看到 Swagger UI。
+- **验收**：`./gradlew bootRun` 启动成功，访问 http://localhost:8080/swagger-ui.html 能看到 Swagger UI。
 
 ---
 
@@ -125,7 +125,7 @@
 
 | 阶段 | 验收方式 |
 |------|----------|
-| 0 | 启动应用，打开 Swagger UI，无报错。 |
+| 0 | `./gradlew bootRun` 启动应用，打开 Swagger UI，无报错。 |
 | 1 | 不依赖 HTTP：单测反序列化 issue-115 的 JSON。 |
 | 2 | 单测加载 PDF 得到 PDDocument。 |
 | 3 | Swagger UI：上传 PDF + JSON，接口 200 且能解析；坏 JSON 返回 4xx。 |
@@ -154,7 +154,7 @@
 
 ## 8. 后端项目 `.gitignore`
 
-在后端项目**根目录**新建 `.gitignore`，避免把构建产物、IDE 配置、生成文件等提交到 GitHub。建议内容如下（Maven 为主；若用 Gradle 保留 `build/` 即可）：
+在后端项目**根目录**新建 `.gitignore`，避免把构建产物、IDE 配置、生成文件等提交到 GitHub。建议内容如下（当前为 Gradle 项目，保留 `build/`、`.gradle/` 忽略）：
 
 ```gitignore
 # Build
@@ -203,7 +203,10 @@ application-local.properties
 .env.local
 *.local
 
-# Maven
+# Gradle
+.gradle/
+
+# Maven（若改用 Maven 可保留）
 pom.xml.tag
 pom.releaseBackup
 *.releaseBackup
@@ -215,4 +218,4 @@ pom.releaseBackup
 - **IDE**：不同人可能用 IntelliJ / Eclipse / VS Code，忽略各自配置可避免合并冲突和因人而异的文件。
 - **生成 PDF**：若 `pdf.output.dir` 指向项目内的 `output/` 或 `filled-pdfs/` 等目录，务必在 `.gitignore` 中写上该目录名，避免把测试生成的 PDF 提交进仓库。
 - **本地配置**：若用 `application-local.yml` 存本机路径或密钥，不要提交；可提交 `application-local.yml.example` 作为模板。
-- **依赖/锁文件**：Maven 的 `pom.xml` 要提交；Gradle 的 `gradle-wrapper.jar` 若存在可提交，`gradle-wrapper.properties` 一般也提交；不需要把整个 `~/.m2/repository` 拷进项目。
+- **依赖/锁文件**：Gradle 的 `build.gradle`、`settings.gradle`、`gradlew`、`gradle/wrapper/`（含 `gradle-wrapper.jar` 与 `gradle-wrapper.properties`）需提交；不需要提交 `build/` 或 `.gradle/`。

@@ -44,7 +44,10 @@ application-local.properties
 .env.local
 *.local
 
-# Maven
+# Gradle
+.gradle/
+
+# Maven (if ever re-added)
 pom.xml.tag
 pom.releaseBackup
 *.releaseBackup
