@@ -1,15 +1,12 @@
 package com.pdfformfill.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pdfformfill.dto.FieldsDefinition;
-import com.pdfformfill.dto.MergeCheckResponse;
-import com.pdfformfill.pdf.PdfTemplateLoader;
+import com.pdfformfill.dto.MergeResponse;
+import com.pdfformfill.service.PdfFormFillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,31 +17,29 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
- * REST 接口：接收 PDF 模板 + 表单字段定义 JSON，当前仅做解析与校验（阶段 3）。
+ * REST 接口：接收 PDF 模板 + 表单字段定义 JSON，合并填表并保存到配置目录（阶段 6）。
  */
 @RestController
 @RequestMapping("/api/pdf")
 public class PdfMergeController {
 
-    private final PdfTemplateLoader pdfTemplateLoader;
-    private final ObjectMapper objectMapper;
+    private final PdfFormFillService pdfFormFillService;
 
-    public PdfMergeController(PdfTemplateLoader pdfTemplateLoader, ObjectMapper objectMapper) {
-        this.pdfTemplateLoader = pdfTemplateLoader;
-        this.objectMapper = objectMapper;
+    public PdfMergeController(PdfFormFillService pdfFormFillService) {
+        this.pdfFormFillService = pdfFormFillService;
     }
 
     @Operation(
-            summary = "校验模板与定义文件",
-            description = "上传 PDF 模板与 issue-115 格式的字段定义 JSON，仅解析并校验，暂不生成填好的 PDF。"
+            summary = "合并并保存填好的 PDF",
+            description = "上传 PDF 模板与 issue-115 格式的字段定义 JSON，按定义生成 mock 数据填入 AcroForm，保存到 pdf.output.dir，返回输出文件路径。"
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "解析成功"),
-            @ApiResponse(responseCode = "400", description = "请求参数无效（缺少文件或格式错误）"),
-            @ApiResponse(responseCode = "415", description = "不支持的媒体类型或内容无法解析")
+            @ApiResponse(responseCode = "200", description = "保存成功，返回 outputPath"),
+            @ApiResponse(responseCode = "400", description = "请求参数无效（缺少文件或 definition 非合法 JSON）"),
+            @ApiResponse(responseCode = "415", description = "模板不是有效 PDF 或该 PDF 不是表单"),
+            @ApiResponse(responseCode = "500", description = "保存失败（如目录无写权限）")
     })
     @PostMapping(value = "/merge", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> merge(
@@ -58,34 +53,20 @@ public class PdfMergeController {
             return ResponseEntity.badRequest().body(new ErrorBody("Missing or empty definition file."));
         }
 
-        PDDocument document = null;
         try {
-            document = pdfTemplateLoader.load(template.getInputStream());
-            int templatePages = document.getNumberOfPages();
-            if (templatePages <= 0) {
-                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                        .body(new ErrorBody("PDF template has no pages."));
-            }
-
-            String definitionJson = new String(definition.getBytes(), StandardCharsets.UTF_8);
-            FieldsDefinition fieldsDefinition = objectMapper.readValue(definitionJson, FieldsDefinition.class);
-            int definitionFields = fieldsDefinition.fields() != null ? fieldsDefinition.fields().size() : 0;
-
-            return ResponseEntity.ok(MergeCheckResponse.ok(templatePages, definitionFields));
+            MergeResponse result = pdfFormFillService.merge(template, definition);
+            return ResponseEntity.ok(result);
         } catch (JsonProcessingException e) {
             return ResponseEntity.badRequest()
                     .body(new ErrorBody("Invalid definition JSON: " + (e.getMessage() != null ? e.getMessage() : "parse error")));
         } catch (IOException e) {
             String message = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .body(new ErrorBody("Invalid PDF template or stream error: " + message));
-        } finally {
-            if (document != null) {
-                try {
-                    document.close();
-                } catch (IOException ignored) {
-                }
+            if (message.contains("该 PDF 不是表单") || message.contains("no pages")) {
+                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                        .body(new ErrorBody(message));
             }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorBody("Failed to generate or save PDF: " + message));
         }
     }
 
