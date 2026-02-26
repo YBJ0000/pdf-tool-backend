@@ -4,6 +4,7 @@ import com.pdfformfill.dto.FieldDefinition;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.slf4j.Logger;
@@ -94,12 +95,12 @@ public class PdfOverlayRenderer {
                         }
                     }
                     float rectHeight = field.height() != null ? heightPt : (fontSize * DEFAULT_LINE_HEIGHT_FACTOR);
-                    float yPdf = pageHeight - yDefPt - rectHeight;
+                    float yBaseline = baselineForVerticalCenter(pageHeight, yDefPt, rectHeight, fontSize, font);
 
                     try {
                         cs.setFont(font, fontSize);
                         cs.beginText();
-                        cs.newLineAtOffset(xPt, yPdf);
+                        cs.newLineAtOffset(xPt, yBaseline);
                         cs.showText(toDraw);
                         cs.endText();
                     } catch (IOException e) {
@@ -108,6 +109,24 @@ public class PdfOverlayRenderer {
                 }
             }
         }
+    }
+
+    /**
+     * Computes the PDF y-coordinate for the text baseline so that the text is vertically centered
+     * in the rectangle. Definition uses top-left origin with y downward; rect is (yDefPt, yDefPt + rectHeight).
+     */
+    private static float baselineForVerticalCenter(float pageHeight, float yDefPt, float rectHeight, float fontSize, PDFont font) {
+        float rectCenterY = pageHeight - yDefPt - rectHeight / 2f;
+        float ascentPt, descentPt;
+        if (font.getFontDescriptor() != null) {
+            ascentPt = fontSize * font.getFontDescriptor().getAscent() / 1000f;
+            descentPt = fontSize * font.getFontDescriptor().getDescent() / 1000f;
+        } else {
+            ascentPt = fontSize * 0.718f;
+            descentPt = fontSize * -0.176f;
+        }
+        float textVerticalCenterOffset = (ascentPt + descentPt) / 2f;
+        return rectCenterY - textVerticalCenterOffset;
     }
 
     /** Width of text in points (font size applied). */
