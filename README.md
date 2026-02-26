@@ -10,6 +10,7 @@ Backend service that merges **any PDF** with a **fields definition** (JSON from 
 
 - Accepts a **PDF template** (any PDF, with or without AcroForm) and a **definition file** (JSON with a `fields` array: `name`, `type`, `description`, `x`, `y`, `width`, `height`, `page`).
 - **Overlay only:** For each field, generates mock values per type (string, number, date, checkbox, etc.) and **draws** the value as text at `(x, y, width, height)` on the given `page`. Coordinates are interpreted as PDF points (origin bottom-left) unless `scale` is provided.
+- **Gray form fields:** If the template has AcroForm with opaque field backgrounds (e.g. gray boxes), the service **flattens** the form first (by default) so that overlay text is drawn on top and is not covered. Set `pdf.flatten-before-overlay: false` in config to skip flattening (e.g. if a particular PDF has flatten issues).
 - **Definition format:** Optional top-level **`scale`** in the JSON: when present and &gt; 0, `x`, `y`, `width`, `height` are treated as **viewport/canvas pixels** (e.g. from a frontend tool like pdf-tool-spike); the backend converts them to PDF points using `scale` (1 PDF point = `scale` pixels) and flips y from top-left-down to PDF bottom-left-up. Omit `scale` or leave it null to use coordinates as PDF points.
 - Writes the filled PDF to `pdf.output.dir` (default: `./filled-pdfs`).
 
