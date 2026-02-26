@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
 /**
  * Renders field values onto a PDF at positions defined by (x, y, width, height, page) from the
  * field definition. Does not use AcroForm; draws text directly into the page content stream.
- * Phase 2: single-line shrink-to-fit by width; truncate with "..." if still over at min font size.
- * Latin-only (PDType1Font Helvetica).
+ * Coordinate system: definition (x, y) is treated as top-left origin, y downward (e.g. from
+ * issue-115); converted to PDF user space (origin bottom-left, y upward) using page height.
  */
 @Component
 public class PdfOverlayRenderer {
@@ -29,16 +29,22 @@ public class PdfOverlayRenderer {
     private static final float DEFAULT_FONT_SIZE = 12f;
     private static final float MIN_FONT_SIZE = 6f;
     private static final String ELLIPSIS = "...";
+    /** Default line height when field.height is null (for baseline placement). */
+    private static final float DEFAULT_LINE_HEIGHT_FACTOR = 1.2f;
 
     /**
      * For each field, draws its value at (page, x, y). If field has width, uses shrink-to-fit
      * (reduce font size until text fits); if still over at min size, truncates with "...".
+     * Coordinates in the definition are treated as top-left origin, y downward. If {@code scale}
+     * is present and &gt; 0, x/y/width/height are treated as viewport pixels (1 PDF point = scale pixels);
+     * otherwise they are treated as PDF points.
      *
      * @param document  loaded PDF (modified in place)
      * @param fields    list of field definitions (name, type, x, y, width, height, page)
      * @param fieldData map from field name to value (Object; will be stringified)
+     * @param scale     optional scale from frontend (viewport pixels per PDF point); null or &lt;= 0 means coordinates are already in PDF points
      */
-    public void render(PDDocument document, List<FieldDefinition> fields, Map<String, Object> fieldData) throws IOException {
+    public void render(PDDocument document, List<FieldDefinition> fields, Map<String, Object> fieldData, Double scale) throws IOException {
         if (document == null || fields == null || fields.isEmpty()) {
             return;
         }
@@ -58,6 +64,9 @@ public class PdfOverlayRenderer {
                 continue;
             }
             PDPage page = document.getPage(page0Based);
+            float pageHeight = page.getMediaBox().getHeight();
+            float s = (scale != null && scale > 0) ? scale.floatValue() : 1f;
+
             try (PDPageContentStream cs = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
                 cs.setNonStrokingColor(0f, 0f, 0f);
                 for (FieldDefinition field : entry.getValue()) {
@@ -70,7 +79,12 @@ public class PdfOverlayRenderer {
                     if (safe.isEmpty()) {
                         continue;
                     }
-                    Float widthLimit = field.width() != null ? field.width().floatValue() : null;
+                    float xPt = field.x().floatValue() / s;
+                    float yDefPt = field.y().floatValue() / s;
+                    float widthPt = field.width() != null ? field.width().floatValue() / s : 0f;
+                    float heightPt = field.height() != null ? field.height().floatValue() / s : (DEFAULT_FONT_SIZE * DEFAULT_LINE_HEIGHT_FACTOR);
+
+                    Float widthLimit = field.width() != null && widthPt > 0 ? widthPt : null;
                     float fontSize = DEFAULT_FONT_SIZE;
                     String toDraw = safe;
                     if (widthLimit != null && widthLimit > 0) {
@@ -79,10 +93,13 @@ public class PdfOverlayRenderer {
                             toDraw = truncateWithEllipsis(font, safe, fontSize, widthLimit);
                         }
                     }
+                    float rectHeight = field.height() != null ? heightPt : (fontSize * DEFAULT_LINE_HEIGHT_FACTOR);
+                    float yPdf = pageHeight - yDefPt - rectHeight;
+
                     try {
                         cs.setFont(font, fontSize);
                         cs.beginText();
-                        cs.newLineAtOffset(field.x().floatValue(), field.y().floatValue());
+                        cs.newLineAtOffset(xPt, yPdf);
                         cs.showText(toDraw);
                         cs.endText();
                     } catch (IOException e) {

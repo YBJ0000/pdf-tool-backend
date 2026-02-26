@@ -73,7 +73,7 @@ public class PdfFormFillService {
                 List<FieldDefinition> fields = fieldsDefinition.fields() != null
                         ? fieldsDefinition.fields()
                         : Collections.emptyList();
-                pdfOverlayRenderer.render(document, fields, fieldData);
+                pdfOverlayRenderer.render(document, fields, fieldData, fieldsDefinition.scale());
             }
 
             String outputPath = saveToOutputDir(document);

@@ -32,7 +32,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("A", "string", null, 72d, 700d, 200d, 24d, 1)
             );
             Map<String, Object> fieldData = Map.of("A", "test");
-            renderer.render(doc, fields, fieldData);
+            renderer.render(doc, fields, fieldData, null);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -52,8 +52,8 @@ class PdfOverlayRendererTest {
     void render_empty_fields_does_not_throw() throws IOException {
         byte[] pdfBytes = createMinimalPdfWithOnePage();
         try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
-            renderer.render(doc, List.of(), Map.of());
-            renderer.render(doc, null, Map.of("A", "x"));
+            renderer.render(doc, List.of(), Map.of(), null);
+            renderer.render(doc, null, Map.of("A", "x"), null);
         }
     }
 
@@ -66,7 +66,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("B", "string", null, 72d, 650d, 80d, 24d, 1)  // narrow width
             );
             Map<String, Object> fieldData = Map.of("B", "HelloWorldLongText");
-            renderer.render(doc, fields, fieldData);
+            renderer.render(doc, fields, fieldData, null);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -91,7 +91,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("C", "string", null, 72d, 600d, 30d, 24d, 1)  // very narrow
             );
             Map<String, Object> fieldData = Map.of("C", "ThisIsAVeryLongStringThatWillBeTruncated");
-            renderer.render(doc, fields, fieldData);
+            renderer.render(doc, fields, fieldData, null);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
