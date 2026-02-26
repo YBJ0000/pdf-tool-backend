@@ -9,6 +9,9 @@ pdf:
     dir: ${user.dir}/filled-pdfs
   # 有 AcroForm 时是否先 flatten 再绘制（默认 true）。个别 PDF 若 flatten 异常可设为 false
   flatten-before-overlay: true
+  # checkbox/boolean 勾选态图片，用于在矩形内绘制。支持 classpath:xxx 或文件路径；definition JSON 中可覆盖
+  checkbox:
+    checked-image: classpath:checked-symbol.png
 
 spring:
   application:
