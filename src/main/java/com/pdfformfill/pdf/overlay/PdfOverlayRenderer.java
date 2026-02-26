@@ -38,6 +38,8 @@ public class PdfOverlayRenderer {
     private static final String ELLIPSIS = "...";
     /** Default line height when field.height is null (for baseline placement). */
     private static final float DEFAULT_LINE_HEIGHT_FACTOR = 1.2f;
+    /** Horizontal padding (points) on left and right of text within the field rectangle. */
+    private static final float TEXT_HORIZONTAL_PADDING_PT = 3f;
 
     /**
      * For each field, draws its value at (page, x, y). If field has width, uses shrink-to-fit
@@ -113,7 +115,10 @@ public class PdfOverlayRenderer {
                     float widthPt = field.width() != null ? field.width().floatValue() / s : 0f;
                     float heightPt = field.height() != null ? field.height().floatValue() / s : (DEFAULT_FONT_SIZE * DEFAULT_LINE_HEIGHT_FACTOR);
 
-                    Float widthLimit = field.width() != null && widthPt > 0 ? widthPt : null;
+                    float textWidthLimit = widthPt > 2 * TEXT_HORIZONTAL_PADDING_PT
+                            ? widthPt - 2 * TEXT_HORIZONTAL_PADDING_PT
+                            : (widthPt > 0 ? widthPt * 0.5f : 0f);
+                    Float widthLimit = field.width() != null && textWidthLimit > 0 ? textWidthLimit : null;
                     float fontSize = DEFAULT_FONT_SIZE;
                     String toDraw = safe;
                     if (widthLimit != null && widthLimit > 0) {
@@ -124,11 +129,12 @@ public class PdfOverlayRenderer {
                     }
                     float rectHeight = field.height() != null ? heightPt : (fontSize * DEFAULT_LINE_HEIGHT_FACTOR);
                     float yBaseline = baselineForVerticalCenter(pageHeight, yDefPt, rectHeight, fontSize, font);
+                    float textX = xPt + TEXT_HORIZONTAL_PADDING_PT;
 
                     try {
                         cs.setFont(font, fontSize);
                         cs.beginText();
-                        cs.newLineAtOffset(xPt, yBaseline);
+                        cs.newLineAtOffset(textX, yBaseline);
                         cs.showText(toDraw);
                         cs.endText();
                     } catch (IOException e) {
