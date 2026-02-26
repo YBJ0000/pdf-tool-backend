@@ -43,6 +43,9 @@ public class PdfFormFillService {
     @Value("${pdf.flatten-before-overlay:true}")
     private boolean flattenBeforeOverlay;
 
+    @Value("${pdf.checkbox.checked-image:classpath:checked-symbol.png}")
+    private String defaultCheckboxCheckedImage;
+
     public PdfFormFillService(
             PdfTemplateLoader pdfTemplateLoader,
             ObjectMapper objectMapper,
@@ -80,7 +83,10 @@ public class PdfFormFillService {
             List<FieldDefinition> fields = fieldsDefinition.fields() != null
                     ? fieldsDefinition.fields()
                     : Collections.emptyList();
-            pdfOverlayRenderer.render(document, fields, fieldData, fieldsDefinition.scale());
+            String checkboxImagePath = fieldsDefinition.checkboxCheckedImage() != null
+                    ? fieldsDefinition.checkboxCheckedImage()
+                    : defaultCheckboxCheckedImage;
+            pdfOverlayRenderer.render(document, fields, fieldData, fieldsDefinition.scale(), checkboxImagePath);
 
             String outputPath = saveToOutputDir(document);
             return MergeResponse.ok(outputPath, templatePages, definitionFields);

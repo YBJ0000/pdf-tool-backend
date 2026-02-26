@@ -32,7 +32,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("A", "string", null, 72d, 700d, 200d, 24d, 1)
             );
             Map<String, Object> fieldData = Map.of("A", "test");
-            renderer.render(doc, fields, fieldData, null);
+            renderer.render(doc, fields, fieldData, null, null);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -52,8 +52,8 @@ class PdfOverlayRendererTest {
     void render_empty_fields_does_not_throw() throws IOException {
         byte[] pdfBytes = createMinimalPdfWithOnePage();
         try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
-            renderer.render(doc, List.of(), Map.of(), null);
-            renderer.render(doc, null, Map.of("A", "x"), null);
+            renderer.render(doc, List.of(), Map.of(), null, null);
+            renderer.render(doc, null, Map.of("A", "x"), null, null);
         }
     }
 
@@ -66,7 +66,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("B", "string", null, 72d, 650d, 80d, 24d, 1)  // narrow width
             );
             Map<String, Object> fieldData = Map.of("B", "HelloWorldLongText");
-            renderer.render(doc, fields, fieldData, null);
+            renderer.render(doc, fields, fieldData, null, null);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -82,6 +82,24 @@ class PdfOverlayRendererTest {
         }
     }
 
+    /** Checkbox/boolean with value true and image path draws image (no exception); false draws nothing. */
+    @Test
+    void render_checkbox_true_draws_image_when_path_provided() throws IOException {
+        byte[] pdfBytes = createMinimalPdfWithOnePage();
+        try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
+            List<FieldDefinition> fields = List.of(
+                    new FieldDefinition("chk", "checkbox", null, 72d, 600d, 20d, 20d, 1)
+            );
+            Map<String, Object> fieldData = Map.of("chk", true);
+            renderer.render(doc, fields, fieldData, null, "classpath:checked-symbol.png");
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            byte[] saved = out.toByteArray();
+            assertThat(saved).isNotEmpty();
+        }
+    }
+
     /** Phase 2: very long string in very narrow width is truncated with "...". */
     @Test
     void render_very_long_string_truncates_with_ellipsis() throws IOException {
@@ -91,7 +109,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("C", "string", null, 72d, 600d, 30d, 24d, 1)  // very narrow
             );
             Map<String, Object> fieldData = Map.of("C", "ThisIsAVeryLongStringThatWillBeTruncated");
-            renderer.render(doc, fields, fieldData, null);
+            renderer.render(doc, fields, fieldData, null, null);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
