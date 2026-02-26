@@ -7,6 +7,9 @@ import com.pdfformfill.dto.MergeResponse;
 import com.pdfformfill.pdf.PdfTemplateLoader;
 import com.pdfformfill.pdf.overlay.PdfOverlayRenderer;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,6 +30,8 @@ import java.util.UUID;
 @Service
 public class PdfFormFillService {
 
+    private static final Logger log = LoggerFactory.getLogger(PdfFormFillService.class);
+
     private final PdfTemplateLoader pdfTemplateLoader;
     private final ObjectMapper objectMapper;
     private final FieldDataPreparer fieldDataPreparer;
@@ -34,6 +39,9 @@ public class PdfFormFillService {
 
     @Value("${pdf.output.dir:${user.dir}/filled-pdfs}")
     private String outputDir;
+
+    @Value("${pdf.flatten-before-overlay:true}")
+    private boolean flattenBeforeOverlay;
 
     public PdfFormFillService(
             PdfTemplateLoader pdfTemplateLoader,
@@ -63,6 +71,12 @@ public class PdfFormFillService {
 
             Map<String, Object> fieldData = fieldDataPreparer.prepareMockData(fieldsDefinition);
 
+            // Flatten AcroForm so widget appearances (e.g. gray field backgrounds) are merged
+            // into the page content stream. Our overlay then draws on top and is no longer covered.
+            if (flattenBeforeOverlay) {
+                flattenAcroFormIfPresent(document);
+            }
+
             List<FieldDefinition> fields = fieldsDefinition.fields() != null
                     ? fieldsDefinition.fields()
                     : Collections.emptyList();
@@ -70,6 +84,24 @@ public class PdfFormFillService {
 
             String outputPath = saveToOutputDir(document);
             return MergeResponse.ok(outputPath, templatePages, definitionFields);
+        }
+    }
+
+    /**
+     * If the document has an AcroForm, flatten it so that form field widget appearances
+     * (e.g. gray backgrounds) are merged into the page content stream. After that, our
+     * overlay text is drawn on top and is no longer covered by annotation layers.
+     */
+    private void flattenAcroFormIfPresent(PDDocument document) {
+        try {
+            PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm(null);
+            if (acroForm == null) {
+                return;
+            }
+            acroForm.flatten();
+            log.debug("AcroForm flattened so overlay text will appear above field backgrounds.");
+        } catch (Exception e) {
+            log.warn("Could not flatten AcroForm (document may have no form or flatten failed): {}. Overlay will still run.", e.getMessage());
         }
     }
 

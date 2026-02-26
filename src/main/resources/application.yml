@@ -3,9 +3,12 @@ server:
   port: 8080
 
 # 生成 PDF 的输出目录（可覆盖为绝对路径，如 /var/pdf-output）
+# 若模板带 AcroForm 且填空处为灰色，先 flatten 再 overlay，文字才不会被灰色盖住
 pdf:
   output:
     dir: ${user.dir}/filled-pdfs
+  # 有 AcroForm 时是否先 flatten 再绘制（默认 true）。个别 PDF 若 flatten 异常可设为 false
+  flatten-before-overlay: true
 
 spring:
   application:
