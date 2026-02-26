@@ -2,6 +2,8 @@
 
 本文档是给 Agent 的实现指导，用于实现 **issue-122**：后端接收 PDF 模板 + 表单字段定义 JSON，合并生成填好的 PDF 并保存。与 **issue-115** 产出的 JSON 格式兼容。
 
+**当前实现**：无论 PDF 是否有 AcroForm，**统一按 overlay 处理**——根据 definition 的 `x, y, width, height, page` 在对应位置绘制文本，不再对 AcroForm 做填表。详见 `IMPLEMENTATION-GUIDE-122-overlay.md`。
+
 ---
 
 ## 1. 目标与范围

@@ -12,7 +12,8 @@ JSON definition.
 
 The solution must work for PDFs that do **not** contain form fields.
 
-The backend will support **two modes** in the same project: if the template has AcroForm, use form filling (existing behaviour); otherwise use coordinate-based overlay rendering (this document). That way both “form PDF” and “any PDF” are supported.
+**Current implementation:** The backend uses **overlay only** for all PDFs (no AcroForm form-fill). Original note:
+The backend was to support **overlay only** (obsolete: previously "two modes") in the same project: if the template has AcroForm, use form filling (existing behaviour); otherwise use coordinate-based overlay rendering (this document). That way both “form PDF” and “any PDF” are supported.
 
 ------------------------------------------------------------------------
 

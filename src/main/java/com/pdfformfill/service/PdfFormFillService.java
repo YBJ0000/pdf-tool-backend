@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pdfformfill.dto.FieldDefinition;
 import com.pdfformfill.dto.FieldsDefinition;
 import com.pdfformfill.dto.MergeResponse;
-import com.pdfformfill.pdf.PdfFormFiller;
 import com.pdfformfill.pdf.PdfTemplateLoader;
 import com.pdfformfill.pdf.overlay.PdfOverlayRenderer;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -23,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 编排：加载模板 → 解析定义 → 准备 mock 数据 → 按模式合并（有 AcroForm 则填表，否则 overlay）→ 保存。
+ * 编排：加载模板 → 解析定义 → 准备 mock 数据 → overlay 渲染（任意 PDF 均按坐标绘制）→ 保存。
  */
 @Service
 public class PdfFormFillService {
@@ -31,7 +30,6 @@ public class PdfFormFillService {
     private final PdfTemplateLoader pdfTemplateLoader;
     private final ObjectMapper objectMapper;
     private final FieldDataPreparer fieldDataPreparer;
-    private final PdfFormFiller pdfFormFiller;
     private final PdfOverlayRenderer pdfOverlayRenderer;
 
     @Value("${pdf.output.dir:${user.dir}/filled-pdfs}")
@@ -41,13 +39,11 @@ public class PdfFormFillService {
             PdfTemplateLoader pdfTemplateLoader,
             ObjectMapper objectMapper,
             FieldDataPreparer fieldDataPreparer,
-            PdfFormFiller pdfFormFiller,
             PdfOverlayRenderer pdfOverlayRenderer
     ) {
         this.pdfTemplateLoader = pdfTemplateLoader;
         this.objectMapper = objectMapper;
         this.fieldDataPreparer = fieldDataPreparer;
-        this.pdfFormFiller = pdfFormFiller;
         this.pdfOverlayRenderer = pdfOverlayRenderer;
     }
 
@@ -67,14 +63,10 @@ public class PdfFormFillService {
 
             Map<String, Object> fieldData = fieldDataPreparer.prepareMockData(fieldsDefinition);
 
-            if (document.getDocumentCatalog().getAcroForm() != null) {
-                pdfFormFiller.fill(document, fieldData);
-            } else {
-                List<FieldDefinition> fields = fieldsDefinition.fields() != null
-                        ? fieldsDefinition.fields()
-                        : Collections.emptyList();
-                pdfOverlayRenderer.render(document, fields, fieldData, fieldsDefinition.scale());
-            }
+            List<FieldDefinition> fields = fieldsDefinition.fields() != null
+                    ? fieldsDefinition.fields()
+                    : Collections.emptyList();
+            pdfOverlayRenderer.render(document, fields, fieldData, fieldsDefinition.scale());
 
             String outputPath = saveToOutputDir(document);
             return MergeResponse.ok(outputPath, templatePages, definitionFields);
