@@ -18,7 +18,8 @@ import java.util.stream.Collectors;
 /**
  * Renders field values onto a PDF at positions defined by (x, y, width, height, page) from the
  * field definition. Does not use AcroForm; draws text directly into the page content stream.
- * Phase 1: Latin-only (PDType1Font Helvetica); coordinates in PDF user space (origin bottom-left).
+ * Phase 2: single-line shrink-to-fit by width; truncate with "..." if still over at min font size.
+ * Latin-only (PDType1Font Helvetica).
  */
 @Component
 public class PdfOverlayRenderer {
@@ -26,10 +27,12 @@ public class PdfOverlayRenderer {
     private static final Logger log = LoggerFactory.getLogger(PdfOverlayRenderer.class);
 
     private static final float DEFAULT_FONT_SIZE = 12f;
+    private static final float MIN_FONT_SIZE = 6f;
+    private static final String ELLIPSIS = "...";
 
     /**
-     * For each field, draws its value from {@code fieldData} at the field's (page, x, y) with
-     * default font size. Ignores width/height for layout in phase 1 (single line, no shrink-to-fit).
+     * For each field, draws its value at (page, x, y). If field has width, uses shrink-to-fit
+     * (reduce font size until text fits); if still over at min size, truncates with "...".
      *
      * @param document  loaded PDF (modified in place)
      * @param fields    list of field definitions (name, type, x, y, width, height, page)
@@ -56,7 +59,6 @@ public class PdfOverlayRenderer {
             }
             PDPage page = document.getPage(page0Based);
             try (PDPageContentStream cs = new PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
-                cs.setFont(font, DEFAULT_FONT_SIZE);
                 cs.setNonStrokingColor(0f, 0f, 0f);
                 for (FieldDefinition field : entry.getValue()) {
                     Object value = fieldData != null ? fieldData.get(field.name()) : null;
@@ -68,10 +70,20 @@ public class PdfOverlayRenderer {
                     if (safe.isEmpty()) {
                         continue;
                     }
+                    Float widthLimit = field.width() != null ? field.width().floatValue() : null;
+                    float fontSize = DEFAULT_FONT_SIZE;
+                    String toDraw = safe;
+                    if (widthLimit != null && widthLimit > 0) {
+                        fontSize = shrinkToFit(font, safe, widthLimit);
+                        if (textWidthInPoints(font, safe, fontSize) > widthLimit) {
+                            toDraw = truncateWithEllipsis(font, safe, fontSize, widthLimit);
+                        }
+                    }
                     try {
+                        cs.setFont(font, fontSize);
                         cs.beginText();
                         cs.newLineAtOffset(field.x().floatValue(), field.y().floatValue());
-                        cs.showText(safe);
+                        cs.showText(toDraw);
                         cs.endText();
                     } catch (IOException e) {
                         log.warn("Overlay failed for field '{}': {}", field.name(), e.getMessage());
@@ -81,8 +93,36 @@ public class PdfOverlayRenderer {
         }
     }
 
+    /** Width of text in points (font size applied). */
+    private static float textWidthInPoints(PDType1Font font, String text, float fontSize) throws IOException {
+        return font.getStringWidth(text) / 1000f * fontSize;
+    }
+
+    /** Largest font size in [MIN_FONT_SIZE, DEFAULT_FONT_SIZE] such that text width <= widthLimit. */
+    private static float shrinkToFit(PDType1Font font, String text, float widthLimit) throws IOException {
+        float size = DEFAULT_FONT_SIZE;
+        while (size >= MIN_FONT_SIZE && textWidthInPoints(font, text, size) > widthLimit) {
+            size -= 1f;
+        }
+        return Math.max(size, MIN_FONT_SIZE);
+    }
+
+    /** Truncate text so that (text + ELLIPSIS) fits in widthLimit at given fontSize. */
+    private static String truncateWithEllipsis(PDType1Font font, String text, float fontSize, float widthLimit) throws IOException {
+        float ellipsisWidth = textWidthInPoints(font, ELLIPSIS, fontSize);
+        float maxTextWidth = widthLimit - ellipsisWidth;
+        if (maxTextWidth <= 0) {
+            return ELLIPSIS;
+        }
+        String result = text;
+        while (result.length() > 0 && textWidthInPoints(font, result, fontSize) > maxTextWidth) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result + ELLIPSIS;
+    }
+
     /**
-     * Phase 1: Helvetica supports only Latin-1. Strip or replace unsupported chars to avoid PDFBox errors.
+     * Helvetica supports only Latin-1. Replace unsupported chars to avoid PDFBox errors.
      */
     private static String toLatin1Safe(String s) {
         if (s == null) return "";

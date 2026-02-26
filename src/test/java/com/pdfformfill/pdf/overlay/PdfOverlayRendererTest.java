@@ -57,6 +57,57 @@ class PdfOverlayRendererTest {
         }
     }
 
+    /** Phase 2: long string is shrunk to fit within field width; text still appears. */
+    @Test
+    void render_long_string_shrinks_to_fit_width() throws IOException {
+        byte[] pdfBytes = createMinimalPdfWithOnePage();
+        try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
+            List<FieldDefinition> fields = List.of(
+                    new FieldDefinition("B", "string", null, 72d, 650d, 80d, 24d, 1)  // narrow width
+            );
+            Map<String, Object> fieldData = Map.of("B", "HelloWorldLongText");
+            renderer.render(doc, fields, fieldData);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            byte[] saved = out.toByteArray();
+
+            try (PDDocument loaded = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(saved)))) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(1);
+                stripper.setEndPage(1);
+                String pageText = stripper.getText(loaded);
+                assertThat(pageText).contains("HelloWorldLongText");
+            }
+        }
+    }
+
+    /** Phase 2: very long string in very narrow width is truncated with "...". */
+    @Test
+    void render_very_long_string_truncates_with_ellipsis() throws IOException {
+        byte[] pdfBytes = createMinimalPdfWithOnePage();
+        try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
+            List<FieldDefinition> fields = List.of(
+                    new FieldDefinition("C", "string", null, 72d, 600d, 30d, 24d, 1)  // very narrow
+            );
+            Map<String, Object> fieldData = Map.of("C", "ThisIsAVeryLongStringThatWillBeTruncated");
+            renderer.render(doc, fields, fieldData);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            byte[] saved = out.toByteArray();
+
+            try (PDDocument loaded = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(saved)))) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(1);
+                stripper.setEndPage(1);
+                String pageText = stripper.getText(loaded);
+                assertThat(pageText).contains("...");
+                assertThat(pageText).contains("This");  // prefix preserved
+            }
+        }
+    }
+
     private static byte[] createMinimalPdfWithOnePage() throws IOException {
         try (PDDocument doc = new PDDocument()) {
             doc.addPage(new PDPage(PDRectangle.A4));
