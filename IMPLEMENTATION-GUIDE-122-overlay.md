@@ -1,16 +1,15 @@
-# Implementation Guide: Issue #122 — Overlay Rendering & Dual-Mode Support
+# Implementation Guide: Issue #122 — Overlay Rendering
 
-本文档是实现 **坐标叠加渲染（overlay）** 以及 **双模式（表单填充 + overlay）** 的步骤指引。在现有项目基础上扩展：若模板有 AcroForm 则走表单填充，否则走基于 JSON 坐标的 overlay 渲染，从而支持“任意 PDF”。
+本文档是实现 **坐标叠加渲染（overlay）** 的步骤指引。项目**统一按 overlay 处理**：无论 PDF 是否有 AcroForm，均根据 definition 中的 `x, y, width, height, page` 在对应位置绘制字段值，支持任意 PDF。
 
 ---
 
 ## 1. 目标与范围
 
-- **已有能力**：模板 + issue-115 的 definition JSON → 若模板有 AcroForm，按 name 填表并保存。
-- **新增能力**：若模板**没有** AcroForm，则根据 definition 中的 `x, y, width, height, page` 把字段值**绘制**到对应位置，生成新 PDF（不创建/不依赖表单域）。
-- **双模式**：同一接口、同一 JSON 格式；后端自动判断：有 AcroForm → 表单填充，无 AcroForm → overlay 渲染。
-- **技术栈**：沿用现有（Java 17+, Spring Boot 3.x, PDFBox 3.x）；overlay 使用 PDFBox 的 `PDPageContentStream` 在指定页、指定矩形内绘制文本。
-- **约束**：overlay 相关实现放在独立 package（如 `...pdf.overlay` 或 `...overlay`），与现有 form-fill 分层并列，可单独单测。
+- **当前能力**：模板 + issue-115 的 definition JSON → 根据 `x, y, width, height, page` 把字段值**绘制**到对应位置，生成新 PDF（不依赖 AcroForm）。
+- **统一 overlay**：有表单、无表单的 PDF 均走同一套 overlay 渲染；不再对 AcroForm 做“填表”处理。
+- **技术栈**：Java 17+, Spring Boot 3.x, PDFBox 3.x；overlay 使用 `PDPageContentStream` 在指定页、指定矩形内绘制文本。
+- **约束**：overlay 实现放在 `...pdf.overlay`，可单独单测。
 
 ---
 
@@ -61,41 +60,24 @@
 
 ---
 
-### 阶段 3：双模式集成
+### 阶段 3：服务集成（当前实现）
 
-- **先做**：
-  - 在现有 `PdfFormFillService.merge(...)` 中，在加载 template、解析 definition、准备好 `fieldData` 之后：
-    - 若 `document.getDocumentCatalog().getAcroForm() != null`：调用现有 `PdfFormFiller.fill(document, fieldData)`（保持现有行为）。
-    - 否则：调用 `PdfOverlayRenderer.render(document, definition.fields(), fieldData)`。
-  - 保存逻辑不变：仍写入 `pdf.output.dir`，返回 `MergeResponse`（含 outputPath）。
-  - 不增加新 API；同一 `POST /api/pdf/merge`，入参不变。
-- **验收**：
-  - 带 AcroForm 的模板 + definition → 行为与当前一致，表单域被填充。
-  - 不带 AcroForm 的模板 + 同一 definition → 生成 PDF 中在对应 (page, x, y, width, height) 位置看到 mock 值（如 "test"）；输出目录下生成新文件。
-
----
-
-### 阶段 4（可选）：显式模式参数
-
-- **先做**：增加可选请求参数，如 `mode=auto|form|overlay`（默认 `auto`）。`auto` 即当前双模式逻辑；`form` 强制走表单填充（无 AcroForm 则 415）；`overlay` 强制走 overlay（忽略 AcroForm）。
-- **验收**：Swagger UI 中分别用 `mode=form`、`mode=overlay`、`mode=auto` 调用，行为符合预期。
+- **实现**：`PdfFormFillService.merge(...)` 在加载 template、解析 definition、准备好 `fieldData` 之后，**始终**调用 `PdfOverlayRenderer.render(document, definition.fields(), fieldData, definition.scale())`，不再根据 AcroForm 分支。保存逻辑不变：写入 `pdf.output.dir`，返回 `MergeResponse`（含 outputPath）。
+- **验收**：任意 PDF 模板 + definition → 在对应 (page, x, y, width, height) 位置看到 mock 值；若 definition 带 `scale`（如前端导出），坐标按 viewport 像素换算，位置与前端一致。
 
 ---
 
 ## 4. 推荐包结构与分层
 
-- **现有**：`api`、`service`（含 `FieldDataPreparer`）、`dto`、`pdf`（`PdfTemplateLoader`、`PdfFormFiller`）保持不变。
-- **新增**：
-  - `pdf.overlay`（或顶层 `overlay`）：`PdfOverlayRenderer`；必要时抽离 `TextLayoutHelper`、`FontProvider` 等便于单测。
-  - `PdfFormFillService` 仅做“选路”和调用，overlay 细节不散落在 service 中。
+- **现有**：`api`、`service`（含 `FieldDataPreparer`）、`dto`、`pdf`（`PdfTemplateLoader`）保持不变。
+- **overlay**：`pdf.overlay.PdfOverlayRenderer`；overlay 细节在 renderer 内，`PdfFormFillService` 仅做编排与调用。
 
 ---
 
 ## 5. 与 issue-115 / 现有 JSON 的对应关系
 
-- definition JSON 格式**不变**：仍为 `fields[]`，每项含 `name`, `type`, `description`, `x`, `y`, `width`, `height`, `page`。
-- **表单模式**：主要用 `name`（和 type 做 mock）；`x,y,width,height,page` 已解析但当前未用。
-- **Overlay 模式**：用 `name`（取值）、`type`（格式化）、`x`, `y`, `width`, `height`, `page`（定位与布局）。同一份 JSON 两种模式都可消费。
+- definition JSON 格式**不变**：仍为 `fields[]`，每项含 `name`, `type`, `description`, `x`, `y`, `width`, `height`, `page`；可选顶层 `scale`（前端 viewport 像素换算用）。
+- **Overlay**：用 `name`（取值）、`type`（mock 格式化）、`x`, `y`, `width`, `height`, `page`（定位与布局）；带 `scale` 时坐标按 viewport 像素换算为 PDF 点。
 
 ---
 
