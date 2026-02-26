@@ -1,10 +1,12 @@
 package com.pdfformfill.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pdfformfill.dto.FieldDefinition;
 import com.pdfformfill.dto.FieldsDefinition;
 import com.pdfformfill.dto.MergeResponse;
 import com.pdfformfill.pdf.PdfFormFiller;
 import com.pdfformfill.pdf.PdfTemplateLoader;
+import com.pdfformfill.pdf.overlay.PdfOverlayRenderer;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,11 +17,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * 编排：加载模板 → 解析定义 → 准备 mock 数据 → 合并填表 → 保存到配置目录。
+ * 编排：加载模板 → 解析定义 → 准备 mock 数据 → 按模式合并（有 AcroForm 则填表，否则 overlay）→ 保存。
  */
 @Service
 public class PdfFormFillService {
@@ -28,6 +32,7 @@ public class PdfFormFillService {
     private final ObjectMapper objectMapper;
     private final FieldDataPreparer fieldDataPreparer;
     private final PdfFormFiller pdfFormFiller;
+    private final PdfOverlayRenderer pdfOverlayRenderer;
 
     @Value("${pdf.output.dir:${user.dir}/filled-pdfs}")
     private String outputDir;
@@ -36,12 +41,14 @@ public class PdfFormFillService {
             PdfTemplateLoader pdfTemplateLoader,
             ObjectMapper objectMapper,
             FieldDataPreparer fieldDataPreparer,
-            PdfFormFiller pdfFormFiller
+            PdfFormFiller pdfFormFiller,
+            PdfOverlayRenderer pdfOverlayRenderer
     ) {
         this.pdfTemplateLoader = pdfTemplateLoader;
         this.objectMapper = objectMapper;
         this.fieldDataPreparer = fieldDataPreparer;
         this.pdfFormFiller = pdfFormFiller;
+        this.pdfOverlayRenderer = pdfOverlayRenderer;
     }
 
     /**
@@ -59,7 +66,15 @@ public class PdfFormFillService {
             int definitionFields = fieldsDefinition.fields() != null ? fieldsDefinition.fields().size() : 0;
 
             Map<String, Object> fieldData = fieldDataPreparer.prepareMockData(fieldsDefinition);
-            pdfFormFiller.fill(document, fieldData);
+
+            if (document.getDocumentCatalog().getAcroForm() != null) {
+                pdfFormFiller.fill(document, fieldData);
+            } else {
+                List<FieldDefinition> fields = fieldsDefinition.fields() != null
+                        ? fieldsDefinition.fields()
+                        : Collections.emptyList();
+                pdfOverlayRenderer.render(document, fields, fieldData);
+            }
 
             String outputPath = saveToOutputDir(document);
             return MergeResponse.ok(outputPath, templatePages, definitionFields);
