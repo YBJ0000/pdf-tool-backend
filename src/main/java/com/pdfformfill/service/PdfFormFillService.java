@@ -5,6 +5,7 @@ import com.pdfformfill.dto.FieldDefinition;
 import com.pdfformfill.dto.FieldsDefinition;
 import com.pdfformfill.dto.MergeResponse;
 import com.pdfformfill.pdf.PdfTemplateLoader;
+import com.pdfformfill.pdf.overlay.OverlayOptions;
 import com.pdfformfill.pdf.overlay.PdfOverlayRenderer;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
@@ -83,10 +84,8 @@ public class PdfFormFillService {
             List<FieldDefinition> fields = fieldsDefinition.fields() != null
                     ? fieldsDefinition.fields()
                     : Collections.emptyList();
-            String checkboxImagePath = fieldsDefinition.checkboxCheckedImage() != null
-                    ? fieldsDefinition.checkboxCheckedImage()
-                    : defaultCheckboxCheckedImage;
-            pdfOverlayRenderer.render(document, fields, fieldData, fieldsDefinition.scale(), checkboxImagePath);
+            OverlayOptions options = OverlayOptions.from(fieldsDefinition, defaultCheckboxCheckedImage);
+            pdfOverlayRenderer.render(document, fields, fieldData, options);
 
             String outputPath = saveToOutputDir(document);
             return MergeResponse.ok(outputPath, templatePages, definitionFields);
