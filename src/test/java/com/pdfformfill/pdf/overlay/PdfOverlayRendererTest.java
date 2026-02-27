@@ -32,7 +32,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("A", "string", null, 72d, 700d, 200d, 24d, 1)
             );
             Map<String, Object> fieldData = Map.of("A", "test");
-            renderer.render(doc, fields, fieldData, null, null);
+            renderer.render(doc, fields, fieldData, defaultOptions());
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -52,8 +52,8 @@ class PdfOverlayRendererTest {
     void render_empty_fields_does_not_throw() throws IOException {
         byte[] pdfBytes = createMinimalPdfWithOnePage();
         try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
-            renderer.render(doc, List.of(), Map.of(), null, null);
-            renderer.render(doc, null, Map.of("A", "x"), null, null);
+            renderer.render(doc, List.of(), Map.of(), defaultOptions());
+            renderer.render(doc, null, Map.of("A", "x"), defaultOptions());
         }
     }
 
@@ -66,7 +66,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("B", "string", null, 72d, 650d, 80d, 24d, 1)  // narrow width
             );
             Map<String, Object> fieldData = Map.of("B", "HelloWorldLongText");
-            renderer.render(doc, fields, fieldData, null, null);
+            renderer.render(doc, fields, fieldData, defaultOptions());
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -91,7 +91,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("chk", "checkbox", null, 72d, 600d, 20d, 20d, 1)
             );
             Map<String, Object> fieldData = Map.of("chk", true);
-            renderer.render(doc, fields, fieldData, null, "classpath:checked-symbol.png");
+            renderer.render(doc, fields, fieldData, optionsWithCheckbox("classpath:checked-symbol.png"));
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -109,7 +109,7 @@ class PdfOverlayRendererTest {
                     new FieldDefinition("C", "string", null, 72d, 600d, 30d, 24d, 1)  // very narrow
             );
             Map<String, Object> fieldData = Map.of("C", "ThisIsAVeryLongStringThatWillBeTruncated");
-            renderer.render(doc, fields, fieldData, null, null);
+            renderer.render(doc, fields, fieldData, defaultOptions());
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.save(out);
@@ -124,6 +124,16 @@ class PdfOverlayRendererTest {
                 assertThat(pageText).contains("This");  // prefix preserved
             }
         }
+    }
+
+    private static OverlayOptions defaultOptions() {
+        return new OverlayOptions(null, null, OverlayOptions.DEFAULT_FONT_SIZE, OverlayOptions.DEFAULT_MIN_FONT_SIZE,
+                OverlayOptions.DEFAULT_FONT_COLOR_RGB, OverlayOptions.DEFAULT_PADDING_X, OverlayOptions.DEFAULT_PADDING_Y);
+    }
+
+    private static OverlayOptions optionsWithCheckbox(String checkboxPath) {
+        return new OverlayOptions(null, checkboxPath, OverlayOptions.DEFAULT_FONT_SIZE, OverlayOptions.DEFAULT_MIN_FONT_SIZE,
+                OverlayOptions.DEFAULT_FONT_COLOR_RGB, OverlayOptions.DEFAULT_PADDING_X, OverlayOptions.DEFAULT_PADDING_Y);
     }
 
     private static byte[] createMinimalPdfWithOnePage() throws IOException {
