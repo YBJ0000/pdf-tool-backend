@@ -57,4 +57,27 @@ class FieldDataPreparerTest {
         Map<String, Object> result = preparer.prepareMockData(definition);
         assertThat(result.get("f_unknown")).isEqualTo("test").isInstanceOf(String.class);
     }
+
+    @Test
+    void prepareMockData_uses_human_readable_values_based_on_name_for_person_info() {
+        FieldsDefinition definition = new FieldsDefinition(List.of(
+                new FieldDefinition("Rail worker’s name", "string", null, null, null, null, null, 1),
+                new FieldDefinition("Worker family name", "string", null, null, null, null, null, 1),
+                new FieldDefinition("Work first name", "string", null, null, null, null, null, 1),
+                new FieldDefinition("Worker DOB", "date", null, null, null, null, null, 1),
+                new FieldDefinition("Email", "string", null, null, null, null, null, 1),
+                new FieldDefinition("Phone", "string", null, null, null, null, null, 1),
+                new FieldDefinition("Address", "string", null, null, null, null, null, 1)
+        ));
+
+        Map<String, Object> result = preparer.prepareMockData(definition);
+
+        assertThat(result.get("Rail worker’s name")).isEqualTo("Alex Railworker");
+        assertThat(result.get("Worker family name")).isEqualTo("Smith");
+        assertThat(result.get("Work first name")).isEqualTo("John");
+        assertThat(result.get("Worker DOB")).isEqualTo("1990-01-01");
+        assertThat(result.get("Email")).isEqualTo("worker@example.com");
+        assertThat(result.get("Phone")).isEqualTo("+61 400 123 456");
+        assertThat(result.get("Address")).isEqualTo("123 Sample Street, Sydney NSW 2000");
+    }
 }
