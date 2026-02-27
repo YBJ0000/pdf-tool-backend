@@ -32,8 +32,8 @@ class FieldDataPreparerTest {
                 .containsKey("f_boolean").containsKey("f_date");
         assertThat(result.get("f_string")).isEqualTo("test").isInstanceOf(String.class);
         assertThat(result.get("f_number")).isEqualTo(123).isInstanceOf(Integer.class);
-        assertThat(result.get("f_checkbox")).isEqualTo(Boolean.TRUE).isInstanceOf(Boolean.class);
-        assertThat(result.get("f_boolean")).isEqualTo(Boolean.TRUE).isInstanceOf(Boolean.class);
+        assertThat(result.get("f_checkbox")).isInstanceOf(Boolean.class);
+        assertThat(result.get("f_boolean")).isInstanceOf(Boolean.class);
         assertThat(result.get("f_date")).isEqualTo("2025-01-01").isInstanceOf(String.class);
     }
 
@@ -79,5 +79,25 @@ class FieldDataPreparerTest {
         assertThat(result.get("Email")).isEqualTo("worker@example.com");
         assertThat(result.get("Phone")).isEqualTo("+61 400 123 456");
         assertThat(result.get("Address")).isEqualTo("123 Sample Street, Sydney NSW 2000");
+    }
+
+    @Test
+    void prepareMockData_checkbox_and_boolean_alternate_true_and_false_within_definition() {
+        FieldsDefinition definition = new FieldsDefinition(List.of(
+                new FieldDefinition("cb1", "checkbox", null, null, null, null, null, 1),
+                new FieldDefinition("cb2", "checkbox", null, null, null, null, null, 1),
+                new FieldDefinition("cb3", "checkbox", null, null, null, null, null, 1),
+                new FieldDefinition("flag1", "boolean", null, null, null, null, null, 1),
+                new FieldDefinition("text1", "string", null, null, null, null, null, 1)
+        ));
+
+        Map<String, Object> result = preparer.prepareMockData(definition);
+
+        // 1st checkbox → true, 2nd → false, 3rd → true, then boolean → false, 互相交替
+        assertThat(result.get("cb1")).isEqualTo(Boolean.TRUE);
+        assertThat(result.get("cb2")).isEqualTo(Boolean.FALSE);
+        assertThat(result.get("cb3")).isEqualTo(Boolean.TRUE);
+        assertThat(result.get("flag1")).isEqualTo(Boolean.FALSE);
+        assertThat(result.get("text1")).isEqualTo("test");
     }
 }

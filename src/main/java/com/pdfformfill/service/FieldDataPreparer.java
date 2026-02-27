@@ -28,6 +28,8 @@ public class FieldDataPreparer {
 
     /**
      * 为定义中的每个字段生成 mock 值，key 为 field name，value 与 type 对应。
+     * checkbox/boolean 字段会在同一个 definition 内交替生成 true / false，
+     * 避免所有勾选框都为选中状态；只有 1 个时仍为 true。
      *
      * @param definition 表单字段定义，可为 null 或 fields 为 null，此时返回空 map
      * @return name → mock value，不修改调用方
@@ -38,9 +40,17 @@ public class FieldDataPreparer {
             return result;
         }
         List<FieldDefinition> fields = definition.fields();
+        int checkboxIndex = 0;
         for (FieldDefinition field : fields) {
             String name = field.name();
             if (name == null) {
+                continue;
+            }
+            if (isCheckboxOrBoolean(field.type())) {
+                // 在当前 definition 内按顺序交替 true/false：第 1 个 true，第 2 个 false，依此类推
+                boolean value = checkboxIndex % 2 == 0;
+                checkboxIndex++;
+                result.put(name, value);
                 continue;
             }
             result.put(name, mockValueFor(name, field.type()));
@@ -103,18 +113,21 @@ public class FieldDataPreparer {
             return MOCK_DATE;
         }
 
-        // 对于 string、number、boolean/checkbox 仍然保留原来的 type 逻辑，保证兼容性
+        // 对于 string、number 仍然保留原来的 type 逻辑，保证兼容性
         if (type == null) {
             return MOCK_STRING;
         }
         return switch (type.toLowerCase()) {
             case "number" -> MOCK_NUMBER;
-            case "boolean", "checkbox" -> MOCK_BOOLEAN;
             default -> MOCK_STRING; // "string" 及未知类型
         };
     }
 
     private boolean typeEquals(String type, String expected) {
         return type != null && type.equalsIgnoreCase(expected);
+    }
+
+    private boolean isCheckboxOrBoolean(String type) {
+        return typeEquals(type, "checkbox") || typeEquals(type, "boolean");
     }
 }
