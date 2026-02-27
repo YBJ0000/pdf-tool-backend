@@ -43,3 +43,13 @@ Server runs at **http://localhost:8080**. Swagger UI: **http://localhost:8080/sw
    - **template**: upload any PDF.
    - **definition**: upload a JSON file with a `fields` array (`name`, `type`, `description`, `x`, `y`, `width`, `height`, `page`). If coordinates come from a frontend (e.g. pdf-tool-spike export), include **`scale`** in the JSON so positions match; without `scale`, coordinates are treated as PDF points.
 4. On success you get `outputPath`; the filled PDF is saved under that path (e.g. under `filled-pdfs/`).
+
+---
+
+## Mock data strategy
+
+Mock values are generated from field definitions by `FieldDataPreparer`:
+
+- **Type-based defaults**: `string → "test"`, `number → 123`, `date → "2025-01-01"` (used as fallback).
+- **Name-aware overrides** (higher priority than type): common names like *first/family/surname/worker name*, *email*, *phone/facsimile/fax*, *address*, and *DOB/Date of Birth/appointment dates* are mapped to more realistic sample values (e.g. `"John"`, `"Smith"`, `"worker@example.com"`, `"+61 400 123 456"`, `"1990-01-01"`), while keeping the original type-based behavior for other fields.
+ - **Checkbox / boolean**: within a single definition, checkbox/boolean fields alternate `true` / `false` in order (1st true, 2nd false, 3rd true, ...), so not every checkbox is checked in the rendered PDF.
