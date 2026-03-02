@@ -72,13 +72,24 @@ class FieldDataPreparerTest {
 
         Map<String, Object> result = preparer.prepareMockData(definition);
 
-        assertThat(result.get("Rail worker’s name")).isEqualTo("Alex Railworker");
+        assertThat(result.get("Rail worker’s name")).isEqualTo("Alex Railworker Alex Railworker Alex Railworker Alex Railworker Alex Railworker");
         assertThat(result.get("Worker family name")).isEqualTo("Smith");
-        assertThat(result.get("Work first name")).isEqualTo("John");
+        assertThat(result.get("Work first name")).isEqualTo("John John John John John John John John");
         assertThat(result.get("Worker DOB")).isEqualTo("1990-01-01");
         assertThat(result.get("Email")).isEqualTo("worker@example.com");
         assertThat(result.get("Phone")).isEqualTo("+61 400 123 456");
         assertThat(result.get("Address")).isEqualTo("123 Sample Street, Sydney NSW 2000");
+    }
+
+    @Test
+    void prepareMockData_vertical_align_top_string_gets_long_text_for_font_shrink_test() {
+        FieldsDefinition definition = new FieldsDefinition(List.of(
+                new FieldDefinition("Address", "string", null, null, null, null, null, 1, "top"),
+                new FieldDefinition("Notes", "string", null, null, null, null, null, 1, "top")
+        ));
+        Map<String, Object> result = preparer.prepareMockData(definition);
+        assertThat(result.get("Address")).asString().contains("123 Sample Street").contains("Australia").hasSizeGreaterThan(100);
+        assertThat(result.get("Notes")).asString().contains("123 Sample Street").contains("Australia").hasSizeGreaterThan(100);
     }
 
     @Test
