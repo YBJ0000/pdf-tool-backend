@@ -60,7 +60,7 @@ public class FieldDataPreparer {
 
     /** Long text for verticalAlign top / multi-line style fields to exercise font shrink. */
     private static final String MOCK_LONG_TEXT_TOP =
-            "123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception.";
+            "123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception. 123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception. 123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception. 123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception. 123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception. 123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception.";
 
     private Object mockValueFor(FieldDefinition field) {
         String name = field.name();
@@ -71,13 +71,13 @@ public class FieldDataPreparer {
         // 先根据字段名做更“像真的” mock
         // 人名相关
         if (safeName.contains("first name")) {
-            return "John";
+            return "John John John John John John John John";
         }
         if (safeName.contains("family name") || safeName.contains("surname")) {
             return "Smith";
         }
         if (safeName.contains("worker") && safeName.contains("name")) {
-            return "Alex Railworker";
+            return "Alex Railworker Alex Railworker Alex Railworker Alex Railworker Alex Railworker";
         }
         if (safeName.contains("doctor") && safeName.contains("appointment")) {
             return "Dr Taylor";
