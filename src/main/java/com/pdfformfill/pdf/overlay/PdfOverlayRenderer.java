@@ -18,6 +18,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -35,6 +36,8 @@ public class PdfOverlayRenderer {
     private static final String ELLIPSIS = "...";
     /** Default line height when field.height is null (for baseline placement). */
     private static final float DEFAULT_LINE_HEIGHT_FACTOR = 1.2f;
+    /** Fields with height >= this (in definition units) are treated as multi-line and get word wrap. */
+    private static final float MULTI_LINE_HEIGHT_THRESHOLD = 50f;
 
     /**
      * For each field, draws its value at (page, x, y). Options (fontSize, fontColor, paddingX, paddingY, checkbox path)
@@ -118,27 +121,43 @@ public class PdfOverlayRenderer {
                             ? widthPt - 2 * paddingX
                             : (widthPt > 0 ? widthPt * 0.5f : 0f);
                     Float widthLimit = field.width() != null && textWidthLimit > 0 ? textWidthLimit : null;
-                    float fontSize = defaultFontSize;
-                    String toDraw = safe;
-                    if (widthLimit != null && widthLimit > 0) {
-                        fontSize = shrinkToFit(font, safe, widthLimit, defaultFontSize, minFontSize);
-                        if (textWidthInPoints(font, safe, fontSize) > widthLimit) {
-                            toDraw = truncateWithEllipsis(font, safe, fontSize, widthLimit);
+                    boolean multiLine = isMultiLineField(field);
+
+                    if (multiLine && widthLimit != null && widthLimit > 0) {
+                        float availableHeight = heightPt - 2 * paddingY;
+                        if (availableHeight <= 0) {
+                            multiLine = false;
+                        } else {
+                            MultiLineResult ml = computeMultiLine(font, safe, widthLimit, availableHeight, defaultFontSize, minFontSize);
+                            try {
+                                drawMultiLine(cs, font, ml.lines(), ml.fontSize(), pageHeight, yDefPt, heightPt, xPt, paddingX, paddingY, ml.lineHeight());
+                            } catch (IOException e) {
+                                log.warn("Overlay failed for field '{}': {}", field.name(), e.getMessage());
+                            }
                         }
                     }
-                    float rectHeight = field.height() != null ? heightPt : (fontSize * DEFAULT_LINE_HEIGHT_FACTOR);
-                    String verticalAlign = field.verticalAlign() != null ? field.verticalAlign().toLowerCase() : "middle";
-                    float yBaseline = baselineForVerticalAlign(pageHeight, yDefPt, rectHeight, fontSize, font, paddingY, verticalAlign);
-                    float textX = xPt + paddingX;
-
-                    try {
-                        cs.setFont(font, fontSize);
-                        cs.beginText();
-                        cs.newLineAtOffset(textX, yBaseline);
-                        cs.showText(toDraw);
-                        cs.endText();
-                    } catch (IOException e) {
-                        log.warn("Overlay failed for field '{}': {}", field.name(), e.getMessage());
+                    if (!multiLine) {
+                        float fontSize = defaultFontSize;
+                        String toDraw = safe;
+                        if (widthLimit != null && widthLimit > 0) {
+                            fontSize = shrinkToFit(font, safe, widthLimit, defaultFontSize, minFontSize);
+                            if (textWidthInPoints(font, safe, fontSize) > widthLimit) {
+                                toDraw = truncateWithEllipsis(font, safe, fontSize, widthLimit);
+                            }
+                        }
+                        float rectHeight = field.height() != null ? heightPt : (fontSize * DEFAULT_LINE_HEIGHT_FACTOR);
+                        String verticalAlign = field.verticalAlign() != null ? field.verticalAlign().toLowerCase() : "middle";
+                        float yBaseline = baselineForVerticalAlign(pageHeight, yDefPt, rectHeight, fontSize, font, paddingY, verticalAlign);
+                        float textX = xPt + paddingX;
+                        try {
+                            cs.setFont(font, fontSize);
+                            cs.beginText();
+                            cs.newLineAtOffset(textX, yBaseline);
+                            cs.showText(toDraw);
+                            cs.endText();
+                        } catch (IOException e) {
+                            log.warn("Overlay failed for field '{}': {}", field.name(), e.getMessage());
+                        }
                     }
                 }
             }
@@ -147,6 +166,111 @@ public class PdfOverlayRenderer {
 
     private static boolean isCheckboxOrBoolean(String type) {
         return "checkbox".equals(type) || "boolean".equals(type);
+    }
+
+    /** Definition height >= threshold (in definition units) → multi-line with wrap. */
+    private static boolean isMultiLineField(FieldDefinition field) {
+        return field.height() != null && field.height().floatValue() >= MULTI_LINE_HEIGHT_THRESHOLD;
+    }
+
+    private record MultiLineResult(float fontSize, List<String> lines, float lineHeight) {}
+
+    /**
+     * Wraps text by width (word-boundary when possible); returns lines that fit in widthLimit at fontSize.
+     */
+    private static List<String> wrapToLines(PDType1Font font, String text, float widthLimit, float fontSize) throws IOException {
+        List<String> result = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return result;
+        }
+        String[] tokens = text.trim().split("\\s+");
+        StringBuilder line = new StringBuilder();
+        for (int i = 0; i < tokens.length; i++) {
+            String word = tokens[i];
+            String candidate = line.length() > 0 ? line + " " + word : word;
+            if (textWidthInPoints(font, candidate, fontSize) <= widthLimit) {
+                if (line.length() > 0) line.append(' ');
+                line.append(word);
+            } else {
+                if (line.length() > 0) {
+                    result.add(line.toString());
+                    line = new StringBuilder();
+                }
+                if (textWidthInPoints(font, word, fontSize) <= widthLimit) {
+                    line.append(word);
+                } else {
+                    for (int j = 0; j < word.length(); j++) {
+                        String ch = String.valueOf(word.charAt(j));
+                        String c = line.length() > 0 ? line + ch : ch;
+                        if (textWidthInPoints(font, c, fontSize) <= widthLimit) {
+                            line.append(ch);
+                        } else {
+                            if (line.length() > 0) {
+                                result.add(line.toString());
+                                line = new StringBuilder();
+                            }
+                            line.append(ch);
+                        }
+                    }
+                }
+            }
+        }
+        if (line.length() > 0) {
+            result.add(line.toString());
+        }
+        return result;
+    }
+
+    /**
+     * Finds fontSize and wrapped lines so that text fits in widthLimit and total height <= availableHeight.
+     * Reduces fontSize and re-wraps until fit or minFontSize; if still over, truncates to lines that fit (last line ellipsis).
+     */
+    private static MultiLineResult computeMultiLine(PDType1Font font, String text, float widthLimit,
+            float availableHeight, float defaultFontSize, float minFontSize) throws IOException {
+        float fontSize = defaultFontSize;
+        List<String> lines = wrapToLines(font, text, widthLimit, fontSize);
+        float lineHeight = fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
+        while (lines.size() * lineHeight > availableHeight && fontSize > minFontSize) {
+            fontSize -= 1f;
+            fontSize = Math.max(fontSize, minFontSize);
+            lines = wrapToLines(font, text, widthLimit, fontSize);
+            lineHeight = fontSize * DEFAULT_LINE_HEIGHT_FACTOR;
+        }
+        int maxLines = Math.max(1, (int) (availableHeight / lineHeight));
+        if (lines.size() > maxLines) {
+            lines = new ArrayList<>(lines.subList(0, maxLines));
+            String last = lines.get(lines.size() - 1);
+            if (textWidthInPoints(font, last, fontSize) > widthLimit) {
+                String truncated = truncateWithEllipsis(font, last, fontSize, widthLimit);
+                lines.set(lines.size() - 1, truncated);
+            }
+        }
+        return new MultiLineResult(fontSize, lines, lineHeight);
+    }
+
+    /**
+     * Draws multiple lines top-aligned: first line at yDefPt + paddingY (definition top), then downward.
+     */
+    private void drawMultiLine(PDPageContentStream cs, PDType1Font font, List<String> lines, float fontSize,
+            float pageHeight, float yDefPt, float rectHeightPt, float xPt, float paddingX, float paddingY, float lineHeight) throws IOException {
+        if (lines.isEmpty()) {
+            return;
+        }
+        float ascentPt = font.getFontDescriptor() != null
+                ? fontSize * font.getFontDescriptor().getAscent() / 1000f
+                : fontSize * 0.718f;
+        float yTopPdf = pageHeight - (yDefPt + paddingY);
+        float firstBaseline = yTopPdf - ascentPt;
+        float textX = xPt + paddingX;
+
+        cs.setFont(font, fontSize);
+        for (int i = 0; i < lines.size(); i++) {
+            float baseline = firstBaseline - i * lineHeight;
+            cs.beginText();
+            cs.newLineAtOffset(textX, baseline);
+            cs.showText(lines.get(i));
+            cs.endText();
+        }
     }
 
     /**

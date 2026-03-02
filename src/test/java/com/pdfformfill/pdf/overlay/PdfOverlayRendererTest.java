@@ -128,6 +128,34 @@ class PdfOverlayRendererTest {
         }
     }
 
+    /** Multi-line field (height >= 50): text wraps and fits in box, all content appears. */
+    @Test
+    void render_multiline_field_wraps_and_fits() throws IOException {
+        byte[] pdfBytes = createMinimalPdfWithOnePage();
+        try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
+            List<FieldDefinition> fields = List.of(
+                    new FieldDefinition("Addr", "string", null, 72d, 600d, 200d, 60d, 1, "top")  // height 60 >= 50 → multi-line
+            );
+            String text = "Line one here. Line two there. Line three and more.";
+            Map<String, Object> fieldData = Map.of("Addr", text);
+            renderer.render(doc, fields, fieldData, defaultOptions());
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            byte[] saved = out.toByteArray();
+
+            try (PDDocument loaded = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(saved)))) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(1);
+                stripper.setEndPage(1);
+                String pageText = stripper.getText(loaded).replaceAll("\\s+", " ");
+                assertThat(pageText).contains("Line one here");
+                assertThat(pageText).contains("Line two there");
+                assertThat(pageText).contains("Line three and more");
+            }
+        }
+    }
+
     /** Phase 2: very long string in very narrow width is truncated with "...". */
     @Test
     void render_very_long_string_truncates_with_ellipsis() throws IOException {
