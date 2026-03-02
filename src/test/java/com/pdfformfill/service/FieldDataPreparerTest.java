@@ -82,6 +82,18 @@ class FieldDataPreparerTest {
     }
 
     @Test
+    void prepareMockData_vertical_align_top_string_gets_long_text_for_font_shrink_test() {
+        FieldsDefinition definition = new FieldsDefinition(List.of(
+                new FieldDefinition("Address", "string", null, null, null, null, null, 1, "top"),
+                new FieldDefinition("Notes", "string", null, null, null, null, null, 1, "top")
+        ));
+        Map<String, Object> result = preparer.prepareMockData(definition);
+        String longSample = "123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception.";
+        assertThat(result.get("Address")).isEqualTo(longSample);
+        assertThat(result.get("Notes")).isEqualTo(longSample);
+    }
+
+    @Test
     void prepareMockData_checkbox_and_boolean_alternate_true_and_false_within_definition() {
         FieldsDefinition definition = new FieldsDefinition(List.of(
                 new FieldDefinition("cb1", "checkbox", null, null, null, null, null, 1),

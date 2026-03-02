@@ -217,9 +217,20 @@ public class PdfOverlayRenderer {
         return font.getStringWidth(text) / 1000f * fontSize;
     }
 
-    /** Largest font size in [minFontSize, defaultFontSize] such that text width <= widthLimit. */
+    /**
+     * Largest font size in [minFontSize, defaultFontSize] such that text width <= widthLimit.
+     * Uses a direct formula first (fontSize = default * widthLimit/currentWidth), then clamps
+     * and verifies; if still over, decrements by 1pt until fit.
+     */
     private static float shrinkToFit(PDType1Font font, String text, float widthLimit, float defaultFontSize, float minFontSize) throws IOException {
-        float size = defaultFontSize;
+        float textWidthAtDefault = textWidthInPoints(font, text, defaultFontSize);
+        if (textWidthAtDefault <= widthLimit) {
+            return defaultFontSize;
+        }
+        float ratio = widthLimit / textWidthAtDefault;
+        float candidate = defaultFontSize * ratio;
+        candidate = Math.max(minFontSize, Math.min(defaultFontSize, candidate));
+        float size = candidate;
         while (size >= minFontSize && textWidthInPoints(font, text, size) > widthLimit) {
             size -= 1f;
         }

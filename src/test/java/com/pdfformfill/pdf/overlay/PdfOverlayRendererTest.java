@@ -100,6 +100,34 @@ class PdfOverlayRendererTest {
         }
     }
 
+    /** Long text with verticalAlign top: font is shrunk to fit width, full text appears (no ellipsis). */
+    @Test
+    void render_long_text_vertical_align_top_shrinks_to_fit() throws IOException {
+        byte[] pdfBytes = createMinimalPdfWithOnePage();
+        try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(pdfBytes)))) {
+            List<FieldDefinition> fields = List.of(
+                    new FieldDefinition("Addr", "string", null, 72d, 580d, 180d, 36d, 1, "top")
+            );
+            String longText = "123 Sample Street, Sydney NSW 2000, Australia. Unit 5.";
+            Map<String, Object> fieldData = Map.of("Addr", longText);
+            renderer.render(doc, fields, fieldData, defaultOptions());
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.save(out);
+            byte[] saved = out.toByteArray();
+
+            try (PDDocument loaded = Loader.loadPDF(new RandomAccessReadBuffer(new ByteArrayInputStream(saved)))) {
+                PDFTextStripper stripper = new PDFTextStripper();
+                stripper.setStartPage(1);
+                stripper.setEndPage(1);
+                String pageText = stripper.getText(loaded);
+                assertThat(pageText).contains("123 Sample Street");
+                assertThat(pageText).contains("Sydney NSW 2000");
+                assertThat(pageText).doesNotContain("...");  // fitted by shrink, not truncated
+            }
+        }
+    }
+
     /** Phase 2: very long string in very narrow width is truncated with "...". */
     @Test
     void render_very_long_string_truncates_with_ellipsis() throws IOException {

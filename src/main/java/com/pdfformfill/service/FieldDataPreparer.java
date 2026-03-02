@@ -53,13 +53,20 @@ public class FieldDataPreparer {
                 result.put(name, value);
                 continue;
             }
-            result.put(name, mockValueFor(name, field.type()));
+            result.put(name, mockValueFor(field));
         }
         return result;
     }
 
-    private Object mockValueFor(String name, String type) {
+    /** Long text for verticalAlign top / multi-line style fields to exercise font shrink. */
+    private static final String MOCK_LONG_TEXT_TOP =
+            "123 Sample Street, Sydney NSW 2000, Australia. Unit 5, Building B. Contact: reception.";
+
+    private Object mockValueFor(FieldDefinition field) {
+        String name = field.name();
+        String type = field.type();
         String safeName = name == null ? "" : name.toLowerCase();
+        boolean isTopAligned = field.verticalAlign() != null && field.verticalAlign().equalsIgnoreCase("top");
 
         // 先根据字段名做更“像真的” mock
         // 人名相关
@@ -90,9 +97,9 @@ public class FieldDataPreparer {
             return "+61 400 123 456";
         }
 
-        // 地址
+        // 地址：top 对齐的框用长文本以便测试动态缩小字号
         if (safeName.contains("address")) {
-            return "123 Sample Street, Sydney NSW 2000";
+            return isTopAligned ? MOCK_LONG_TEXT_TOP : "123 Sample Street, Sydney NSW 2000";
         }
 
         // 日期类：根据 name 做一点区分
@@ -117,10 +124,14 @@ public class FieldDataPreparer {
         if (type == null) {
             return MOCK_STRING;
         }
-        return switch (type.toLowerCase()) {
-            case "number" -> MOCK_NUMBER;
-            default -> MOCK_STRING; // "string" 及未知类型
-        };
+        if (typeEquals(type, "number")) {
+            return MOCK_NUMBER;
+        }
+        // verticalAlign 为 top 的 string 用较长文本，便于测试单行内缩小字号
+        if (typeEquals(type, "string") && isTopAligned) {
+            return MOCK_LONG_TEXT_TOP;
+        }
+        return MOCK_STRING; // "string" 及未知类型
     }
 
     private boolean typeEquals(String type, String expected) {
